@@ -1,0 +1,55 @@
+# Central settings for the milk HSI pipeline.
+# Every script reads this file, so change values here rather than in code.
+
+paths:
+  raw_dir: data/raw              # one sub-folder per Specim capture (e.g. data/raw/pure-cow-milk/)
+  manifest: data/manifest.csv    # one row per capture with its labels (built by 01_build_manifest.py)
+  processed: data/processed      # extracted ROI spectra / patches
+  results: results               # metrics, predictions, figures
+
+acquisition:
+  bands: 224
+  samples: 512                   # pixels per line after 2x2 binning on the FX10
+  dtype: uint16
+  interleave: bil
+
+roi:
+  size: 7                        # ROI side in pixels (7 x 7 = 49 pixels, the "50-60 pixel" ROI of the paper)
+  n_per_capture: 50              # ROIs sampled per physical sample
+  rim_margin_px: 15              # pixels eroded from the dish edge (rim, meniscus, glare)
+  ratio_max: 0.97                # milk mask: R(900)/R(550) below this (napkin/paper is above 1)
+  min_refl: 0.4                  # milk mask: mean reflectance 420-900 nm above this (background is ~0.02)
+  seed: 0
+  save_patches: true             # keep 7x7xB cubes for the 3D-CNN (float16)
+
+preprocess:
+  wl_min: 420.0                  # band trimming (nm)
+  wl_max: 950.0
+  sg_window: 11
+  sg_poly: 2
+  scatter: snv                   # snv | msc | none
+  minmax: true
+
+cv:
+  outer_folds: 5
+  inner_folds: 3
+  repeats: 3                     # repeated grouped CV -> 15 paired scores for the significance tests
+  seed: 42
+
+tasks:                           # which label columns are modelled
+  - species                      # cow / buffalo / goat
+  - binary                       # pure / adulterated
+  - adulterant                   # pure / water / salicylic / boric / glucose / formalin
+  - level                        # 51 classes per species: pure + 5 adulterants x 10 levels
+
+deep:
+  epochs: 100
+  patience: 15
+  batch_size: 128
+  lr: 0.001
+  weight_decay: 0.0001
+  dropout: 0.3
+  mtl_alpha: 1.0                 # weight of the species loss
+  mtl_beta: 1.0                  # weight of the adulteration losses
+  kd_temperature: 4.0
+  kd_lambda: 0.7
